@@ -14,3 +14,4 @@ dependencies:
     - robocorp==1.4.0             # https://pypi.org/project/robocorp
     - robocorp-browser==2.2.1     # https://pypi.org/project/robocorp-browser
     - requests==2.31.0            # https://pypi.org/project/requests
+    - pandas==2.2.2               # https://pypi.org/project/pandas
