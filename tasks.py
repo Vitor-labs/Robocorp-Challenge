@@ -36,10 +36,10 @@ class APNewsScrapper:
         """
         search news by common keywords
         """
+        self.browser.open_browser(url="https://apnews.com/")
         try:
             keywords = self.json.load_json_from_file(INPUT_URL)['keywords'] # type: ignore
             for word in keywords: # type: ignore
-                self.browser.open_browser(url="https://apnews.com/")
                 self.__search_by_keyword(word)
 
         except Exception as exc:
