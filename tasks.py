@@ -159,20 +159,20 @@ class APNewsScrapper:
         * find_element not working at all, trying with just selenium.
         * SeleniumLibrary WebElement works diferently from pure Selenium WebElement
         """
-        try:
-            results = []
-            money_pattern = re.compile(
-                r'''
-                    \$\d{1,3}(,\d{3})*(\.\d{2})? | # Matches $ followed by digits, commas, and optional cents
-                    \d+(\.\d{2})?\s*dollars |      # Matches number followed by 'dollars'
-                    \d+(\.\d{2})?\s*USD            # Matches number followed by 'USD'
-                ''',
-                re.VERBOSE
-            )
-            def contains_money_format(text):
-                return bool(money_pattern.search(text))
+        results = []
+        money_pattern = re.compile(
+            r'''
+                \$\d{1,3}(,\d{3})*(\.\d{2})? | # Matches $ followed by digits, commas, and optional cents
+                \d+(\.\d{2})?\s*dollars |      # Matches number followed by 'dollars'
+                \d+(\.\d{2})?\s*USD            # Matches number followed by 'USD'
+            ''',
+            re.VERBOSE
+        )
+        def contains_money_format(text):
+            return bool(money_pattern.search(text))
             
-            for element in elements:
+        for element in elements:
+            try:
                 title = element.find_element(By.CLASS_NAME, 'PagePromoContentIcons-text').text
                 link = element.find_element(By.TAG_NAME, 'a').get_attribute('href')
                 dscr = element.find_element(By.CLASS_NAME, 'PagePromo-description').text
@@ -195,13 +195,13 @@ class APNewsScrapper:
                         words_in_dscr
                     ]
                 )
-            return results
-        
-        except Exception as exc:
-            self.browser.screenshot(element, f'output/screenshots/error{inspect.stack()[0][3]}.png')
-            self.browser.close_browser()
-            raise exc
+            except Exception as exc:
+                self.browser.screenshot(element, f'output/screenshots/error{inspect.stack()[0][3]}.png')
+                print(exc)
+                continue
 
+        return results
+            
     def __try_to_find_date(self, element:WebElement) -> str:
         try:
             date = element.find_element(By.CLASS_NAME, 'PagePromo-date').text
