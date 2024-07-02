@@ -18,11 +18,13 @@ class APNewsScrapper:
         """
         Since the flow is continuous, im using a common browser and http client
         to be more memort efficient.
+
+        #FIXME: screenshot directory not working
         """
         self.json = JSON()
         self.vault = Vault()
         self.browser = Selenium()
-        self.browser.set_screenshot_directory(str('.'/OUTPUT_DIR/'screenshots'))
+        # self.browser.set_screenshot_directory(str('.'/OUTPUT_DIR/'screenshots'))
         
     def search_by_keyword(self) -> None:
         """
@@ -86,39 +88,40 @@ class APNewsScrapper:
         # get total number of results
         total = self.browser.get_webelement('//*[@class="SearchResultsModule-count-desktop"]').text # type: ignore
         print("Total", total)
-        # select latest news
-        self.browser.click_element('//*[@class="Select-input"]') # type: ignore
-        self.browser.click_element('//*[@value="3"]') # type: ignore
-        items = []
-        pages = self.browser.get_webelement('//*[@class="Pagination-pageCounts"]').text # type: ignore
-        for _ in range(int(pages.split(" of ")[1])):
-            # find next page button
-            next_page = self.browser.get_webelement('//*[@class="Pagination-nextPage"]')        
-            # log actual page
-            text = self.browser.get_webelement('//*[@class="Pagination-pageCounts"]').text # type: ignore
-            print('Page', text) # type: ignore
-            # get all items related on this page before proceeding to next page, this fixes stale elements.
-            items.extend(
-                self.__collect_data_by_element(
-                    self.browser.get_webelements('//*[@class="PagePromo"]'), search # type: ignore
-                )
-            )
-            break
-            # go to next page
-            next_page.click() # type: ignore
-            self.browser.wait_for_condition("return document.readyState === 'complete'")
-            next_page = self.browser.get_webelement('//*[@class="Pagination-nextPage"]')
+        try:
+            # select latest news
+            self.browser.click_element('//*[@class="Select-input"]') # type: ignore
+            self.browser.click_element('//*[@value="3"]') # type: ignore
+            items = []
+            pages = self.browser.get_webelement('//*[@class="Pagination-pageCounts"]').text # type: ignore
+            for _ in range(int(pages.split(" of ")[1])):
+                # find next page button
+                next_page = self.browser.get_webelement('//*[@class="Pagination-nextPage"]')        
+                # log actual page
+                text = self.browser.get_webelement('//*[@class="Pagination-pageCounts"]').text # type: ignore
+                print('Page', text) # type: ignore
+                # get all items related on this page before proceeding to next page, this fixes stale elements.
+                elements = self.browser.get_webelements('//*[@class="PagePromo"]') # type: ignore
+                items.extend(self.__collect_data_by_element(elements, search))
+                break
+                # go to next page
+                next_page.click() # type: ignore
+                self.browser.wait_for_condition("return document.readyState === 'complete'")
+                next_page = self.browser.get_webelement('//*[@class="Pagination-nextPage"]')
 
-        assert len(items) > 0, "Something got wrong, no items found"
-        print("Done, Collecting data from items")
-        return [ self.__collect_data_by_element(item, search) for item in items ]
+            assert len(items) > 0, "Something got wrong, no items found"
+            print("Done, Collecting data from items")
+            return [ self.__collect_data_by_element(item, search) for item in items ]
+
+        except Exception as exc:
+            raise exc
 
     def __collect_data_by_element(self, elements:List, word:str) -> List[str | int]:
         """
         collect data (title, link, descrition, date, picture, count of word in
         the title, count of word in the description, title or description
-        contains money or not) from an element
-s
+        contains money or not) from an elements
+
         TODO: download picture to output/pictures
         Args:
             elements (List[WebElement]): list of elements to collect data
@@ -126,15 +129,18 @@ s
 
         Returns:
             List[str | int]: list of data gathered
+
+        * find_element not working at all 
         """
         try:
             results = []
             for element in elements:
-                title = element.find_element("span.PagePromoContentIcons-text").text
-                link = element.find_element('a.Link ').get_attribute('href')
-                description = element.find_element('span.PagePromoContentIcons-text').text
-                date = element.find_element('span.Timestamp-template').text
-                picture_url = element.find_element('img.Image').get_attribute('src')
+                title = ''
+                link = ''
+                description = ''
+                date = ''
+                picture_url = ''
+                
                 words_in_title = title.count(word)
                 words_in_description = description.count(word)
 
@@ -142,7 +148,8 @@ s
             return results
         
         except Exception as exc:
-            self.browser.screenshot(element, f'error{inspect.stack()[0][3]}.png')
+            self.browser.screenshot(element, f'output/screenshots/error{inspect.stack()[0][3]}.png')
+            self.browser.close_browser()
             raise exc
 
     def __check_if_results_found(self) -> bool:
