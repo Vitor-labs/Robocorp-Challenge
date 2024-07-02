@@ -36,7 +36,7 @@ class APNewsScrapper:
         """
         search news by common keywords
         """
-        self.browser.open_browser(url="https://apnews.com/")
+        self.browser.open_available_browser(url="https://apnews.com/", headless= True)
         try:
             keywords = self.json.load_json_from_file(INPUT_URL)['keywords'] # type: ignore
             for word in keywords: # type: ignore
