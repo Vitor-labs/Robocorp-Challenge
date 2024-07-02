@@ -43,8 +43,8 @@ class APNewsScrapper:
                 self.__search_by_keyword(word)
 
         except Exception as exc:
-            self.browser.screenshot(filename=f'error_{inspect.stack()[0][3]}.png')
             print(exc)
+            self.browser.screenshot(filename=f'error_{inspect.stack()[0][3]}.png')
 
         finally:
             self.browser.close_all_browsers()
@@ -90,6 +90,7 @@ class APNewsScrapper:
 
         except Exception as exc:
             print(exc)
+            raise exc
 
     def __handle_search_page(self, search:str) -> List[List[str | int]] | None:
         """
