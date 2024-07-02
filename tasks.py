@@ -1,7 +1,11 @@
 import os
+import re
 import inspect
 from typing import List
 from pathlib import Path
+
+from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
 
 from RPA.Browser.Selenium import Selenium
 from RPA.Robocorp.Vault import Vault
@@ -116,7 +120,7 @@ class APNewsScrapper:
         except Exception as exc:
             raise exc
 
-    def __collect_data_by_element(self, elements:List, word:str) -> List[str | int]:
+    def __collect_data_by_element(self, elements:List[WebElement], word:str) -> List[str | int]:
         """
         collect data (title, link, descrition, date, picture, count of word in
         the title, count of word in the description, title or description
@@ -129,22 +133,51 @@ class APNewsScrapper:
 
         Returns:
             List[str | int]: list of data gathered
-
-        * find_element not working at all 
+        
+        Notes:
+        * find_element not working at all, trying with just selenium.
+        * SeleniumLibrary WebElement works diferently from pure Selenium WebElement
         """
         try:
             results = []
+            money_pattern = re.compile(
+                r'''
+                    \$\d{1,3}(,\d{3})*(\.\d{2})? | # Matches $ followed by digits, commas, and optional cents
+                    \d+(\.\d{2})?\s*dollars |      # Matches number followed by 'dollars'
+                    \d+(\.\d{2})?\s*USD            # Matches number followed by 'USD'
+                ''',
+                re.VERBOSE
+            )
+            def contains_money_format(text):
+                return bool(money_pattern.search(text))
+            
             for element in elements:
-                title = ''
-                link = ''
-                description = ''
-                date = ''
-                picture_url = ''
-                
+                title = element.find_element(By.CLASS_NAME, 'PagePromoContentIcons-text').text
+                link = element.find_element(By.TAG_NAME, 'a').get_attribute('href')
+                description = element.find_element(By.CLASS_NAME, 'PagePromo-description').text
+                date = element.find_element(By.CLASS_NAME, 'Timestamp-template').text
+            
+                contains_money = contains_money_format(title) or contains_money_format(description)
+                picture_src = f"output/pictures/{title.lower().replace(' ', '_')}_{date}.png"
+                picture_element = self.browser.get_webelement('//*[@class="PagePromo-media"]', parent=element)
+                self.browser.screenshot(
+                    picture_element, f'output/pictures/{title.lower().replace(" ", "_")}_{date}.png'
+                )
                 words_in_title = title.count(word)
                 words_in_description = description.count(word)
 
-                results.append([title, link, description, date, picture_url, words_in_title, words_in_description])
+                results.append(
+                    [
+                        title,
+                        link,
+                        description,
+                        date,
+                        picture_src,
+                        contains_money,
+                        words_in_title,
+                        words_in_description
+                    ]
+                )
             return results
         
         except Exception as exc:
