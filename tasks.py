@@ -1,8 +1,10 @@
 import os
 import re
+import time
 import inspect
 from typing import List
 from pathlib import Path
+from datetime import datetime
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
@@ -99,6 +101,7 @@ class APNewsScrapper:
             items = []
             pages = self.browser.get_webelement('//*[@class="Pagination-pageCounts"]').text # type: ignore
             for _ in range(int(pages.split(" of ")[1])):
+                time.sleep(1) # Since the images are lazy loaded, we need to wait for them to load.
                 # find next page button
                 next_page = self.browser.get_webelement('//*[@class="Pagination-nextPage"]')        
                 # log actual page
@@ -155,14 +158,10 @@ class APNewsScrapper:
                 title = element.find_element(By.CLASS_NAME, 'PagePromoContentIcons-text').text
                 link = element.find_element(By.TAG_NAME, 'a').get_attribute('href')
                 description = element.find_element(By.CLASS_NAME, 'PagePromo-description').text
-                date = element.find_element(By.CLASS_NAME, 'Timestamp-template').text
+                date = self.__try_to_find_date(element)
             
                 contains_money = contains_money_format(title) or contains_money_format(description)
-                picture_src = f"output/pictures/{title.lower().replace(' ', '_')}_{date}.png"
-                picture_element = self.browser.get_webelement('//*[@class="PagePromo-media"]', parent=element)
-                self.browser.screenshot(
-                    picture_element, f'output/pictures/{title.lower().replace(" ", "_")}_{date}.png'
-                )
+                picture_src = self.__check_if_news_has_img(element, title, date)
                 words_in_title = title.count(word)
                 words_in_description = description.count(word)
 
@@ -184,6 +183,39 @@ class APNewsScrapper:
             self.browser.screenshot(element, f'output/screenshots/error{inspect.stack()[0][3]}.png')
             self.browser.close_browser()
             raise exc
+
+    def __try_to_find_date(self, element:WebElement) -> str:
+        try:
+            date = element.find_element(By.CLASS_NAME, 'PagePromo-date').text
+            if not date:
+                date = element.find_element(By.CLASS_NAME, 'TodayInHistoryPromo-date').text
+            return datetime.strptime(date, '%B %d').strftime('%m-%d') # TODO: get the year
+        except Exception:
+            return 'No date found'
+
+    def __check_if_news_has_img(self, element:WebElement, title:str, date:str) -> str:
+        """
+        Takes in a WebElement, a title string, and a date string and attempts
+        to take a screenshot of the element's 'Image' element. If successful,
+        returns a path for the screenshot. Else returns 'no image found'.
+
+        Args:
+            element (WebElement): The WebElement to take a screenshot of.
+            title (str): The title of the news article.
+            date (str): The date of the news article.
+
+        Returns:
+            str: The file path of the screenshot, or 'no image found'.
+        """
+        try:
+            self.browser.screenshot(
+                element.find_element(By.CLASS_NAME, 'Image'),
+                f'output/pictures/{title.lower().replace(" ", "_")}_{date}.png'
+            )
+            return f'output/pictures/{title.lower().replace(" ", "_")}_{date}.png'
+
+        except Exception:
+            return 'no image found'
 
     def __check_if_results_found(self) -> bool:
         """
