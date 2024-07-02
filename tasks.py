@@ -56,6 +56,15 @@ class APNewsScrapper:
         1. clicks on search icon
         2. expands search box and puts the keyword
         3. submits the search and redirects to the search result page
+        4. get all the news and store in an excel file
+
+        Args:
+            word (str): keyword to search
+
+        Notes:
+            * if keyword is not found, then no results are found
+            * generates a pandas Dataframe with columsn: title, link, description,
+            * date, picture_src, contains_money, words_in_title, words_in_dscr
         """
         try:
             self.browser.get_webelement('//*[@class="SearchOverlay-search-button"]').click()  # type: ignore
@@ -66,7 +75,17 @@ class APNewsScrapper:
             result = self.__handle_search_page(word)
 
             if result:
-                df = pd.DataFrame(result, columns=["title", "link", "description", "date", "picture_url", "words_in_title", "words_in_description"])
+                df = pd.DataFrame(result, columns=[
+                        "title", 
+                        "link", 
+                        "description", 
+                        "date", 
+                        "picture_src", 
+                        'contains_money',
+                        "words_in_title", 
+                        "words_in_description"
+                    ]
+                )
                 df.to_excel(OUTPUT_DIR / f'challenge_{word}.xlsx', index=False)
 
         except Exception as exc:
@@ -110,7 +129,6 @@ class APNewsScrapper:
                 # get all items related on this page before proceeding to next page, this fixes stale elements.
                 elements = self.browser.get_webelements('//*[@class="PagePromo"]') # type: ignore
                 items.extend(self.__collect_data_by_element(elements, search))
-                break
                 # go to next page
                 next_page.click() # type: ignore
                 self.browser.wait_for_condition("return document.readyState === 'complete'")
@@ -118,7 +136,7 @@ class APNewsScrapper:
 
             assert len(items) > 0, "Something got wrong, no items found"
             print("Done, Collecting data from items")
-            return [ self.__collect_data_by_element(item, search) for item in items ]
+            return items
 
         except Exception as exc:
             raise exc
@@ -157,24 +175,24 @@ class APNewsScrapper:
             for element in elements:
                 title = element.find_element(By.CLASS_NAME, 'PagePromoContentIcons-text').text
                 link = element.find_element(By.TAG_NAME, 'a').get_attribute('href')
-                description = element.find_element(By.CLASS_NAME, 'PagePromo-description').text
+                dscr = element.find_element(By.CLASS_NAME, 'PagePromo-description').text
                 date = self.__try_to_find_date(element)
             
-                contains_money = contains_money_format(title) or contains_money_format(description)
+                contains_money = contains_money_format(title) or contains_money_format(dscr)
                 picture_src = self.__check_if_news_has_img(element, title, date)
                 words_in_title = title.count(word)
-                words_in_description = description.count(word)
+                words_in_dscr = dscr.count(word)
 
                 results.append(
                     [
                         title,
                         link,
-                        description,
+                        dscr,
                         date,
                         picture_src,
                         contains_money,
                         words_in_title,
-                        words_in_description
+                        words_in_dscr
                     ]
                 )
             return results
