@@ -52,7 +52,7 @@ class APNewsScrapper:
 
         except Exception as exc:
             print(exc)
-            self.browser.screenshot(filename=f'error_{inspect.stack()[0][3]}.png')
+            self.browser.screenshot(filename=f'output/screenshots/error_{inspect.stack()[0][3]}.png')
 
         finally:
             self.browser.close_all_browsers()
