@@ -44,7 +44,6 @@ class APNewsScrapper:
         self.browser.open_browser(
             url="https://apnews.com/",
             browser='firefox',
-            options={'headless': True},
         )
         keywords = (
             keywrds
@@ -57,8 +56,9 @@ class APNewsScrapper:
 
         except Exception as exc:
             print(exc)
-            self.browser.screenshot(filename=f'output/screenshots/error_{inspect.stack()[0][3]}.png')
-
+            self.browser.screenshot(
+                filename=str(OUTPUT_DIR /f'/screenshots/error_{inspect.stack()[0][3]}.png')
+            )
         finally:
             self.browser.close_all_browsers()
             print('Done')
@@ -98,11 +98,12 @@ class APNewsScrapper:
                         "words_in_description"
                     ]
                 )
+                path = str(OUTPUT_DIR / f'challenge_{word}.xlsx')
                 excel = Files()
+                excel.open_workbook(path)
                 excel.create_worksheet(f'challenge_{word}')
-                excel.save_workbook(path=str(OUTPUT_DIR / f'challenge_{word}.xlsx'))
-                df.to_excel(OUTPUT_DIR / f'challenge_{word}.xlsx', index=False)
-                storage.set_file(f'challenge_{word}.csv',str(OUTPUT_DIR))
+                df.to_excel(path, index=False)
+                storage.set_file(f'challenge_{word}.csv',path)
                 print(f'Saved {df.shape[0]} records')
 
         except Exception as exc:
@@ -247,12 +248,12 @@ class APNewsScrapper:
             str: The file path of the screenshot, or 'no image found'.
         """
         try:
-            path = f'output/pictures/{title.lower().replace(" ", "_")}_{date}.png'
+            path = str(OUTPUT_DIR / f'/pictures/{title.lower().replace(" ", "_")}_{date}.png')
             item = workitems.outputs.create(save=False)
             self.browser.screenshot(
                 element.find_element(By.CLASS_NAME, 'Image'),
             )
-            item.add_file(path, name=f"document-{element.id}")
+            item.add_file(path)
             item.save()
             return path
 
