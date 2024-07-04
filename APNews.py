@@ -9,8 +9,9 @@ from datetime import datetime
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.common.by import By
 from RPA.Browser.Selenium import Selenium
+from robocorp import workitems, storage
 from RPA.Robocorp.Vault import Vault
-from robocorp import workitems
+from RPA.Excel.Files import Files
 from RPA.JSON import JSON
 import pandas as pd
 
@@ -40,14 +41,18 @@ class APNewsScrapper:
         Args:
             keywrds (List[str], optional): list of keywords to search. Defaults to [].
         """
-        self.browser.open_available_browser(url="https://apnews.com/", headless= True)
+        self.browser.open_browser(
+            url="https://apnews.com/",
+            browser='firefox',
+            options={'headless': True},
+        )
         keywords = (
             keywrds
             if len(keywrds) > 0
-            else self.json.load_json_from_file(INPUT_URL)['keywords'] # type: ignore
+            else self.json.load_json_from_file(INPUT_URL)['keywords']
         )
         try:
-            for word in keywords: # type: ignore
+            for word in keywords:
                 self.__search_by_keyword(word)
 
         except Exception as exc:
@@ -70,18 +75,17 @@ class APNewsScrapper:
             word (str): keyword to search
 
         Notes:
-            * if keyword is not found, then no results are found
-            * generates a pandas Dataframe with columsn: title, link, description,
-            * date, picture_src, contains_money, words_in_title, words_in_dscr
+        * if keyword is not found, then no results are found
+        * generates a pandas Dataframe with columsn: title, link, description,
+        * date, picture_src, contains_money, words_in_title, words_in_dscr
         """
         try:
-            self.browser.get_webelement('//*[@class="SearchOverlay-search-button"]').click()  # type: ignore
-            self.browser.get_webelement('//*[@class="SearchOverlay-search-input"]').send_keys(word)  # type: ignore
-            self.browser.get_webelement('//*[@class="SearchOverlay-search-submit"]').click()  # type: ignore
+            self.browser.get_webelement('//*[@class="SearchOverlay-search-button"]').click() 
+            self.browser.get_webelement('//*[@class="SearchOverlay-search-input"]').send_keys(word) 
+            self.browser.get_webelement('//*[@class="SearchOverlay-search-submit"]').click() 
             self.browser.wait_for_condition("return document.readyState === 'complete'")
 
             result = self.__handle_search_page(word)
-
             if result:
                 df = pd.DataFrame(result, columns=[
                         "title", 
@@ -94,10 +98,12 @@ class APNewsScrapper:
                         "words_in_description"
                     ]
                 )
-                workitems.outputs.create(
-                    files=[OUTPUT_DIR / f'challenge_{word}.csv']
-                )
-                df.to_csv(OUTPUT_DIR / f'challenge_{word}.csv', index=False)
+                excel = Files()
+                excel.create_worksheet(f'challenge_{word}')
+                excel.save_workbook(path=str(OUTPUT_DIR / f'challenge_{word}.xlsx'))
+                df.to_excel(OUTPUT_DIR / f'challenge_{word}.xlsx', index=False)
+                storage.set_file(f'challenge_{word}.csv',str(OUTPUT_DIR))
+                print(f'Saved {df.shape[0]} records')
 
         except Exception as exc:
             print(exc)
@@ -123,25 +129,25 @@ class APNewsScrapper:
             print("No Result Found for", search)
             return
         # get total number of results
-        total = self.browser.get_webelement('//*[@class="SearchResultsModule-count-desktop"]').text # type: ignore
+        total = self.browser.get_webelement('//*[@class="SearchResultsModule-count-desktop"]').text
         print("Total", total)
         try:
             # select latest news
-            self.browser.click_element('//*[@class="Select-input"]') # type: ignore
-            self.browser.click_element('//*[@value="3"]') # type: ignore
+            self.browser.click_element('//*[@class="Select-input"]')
+            self.browser.click_element('//*[@value="3"]')
             items = []
-            pages = self.browser.get_webelement('//*[@class="Pagination-pageCounts"]').text # type: ignore
+            pages = self.browser.get_webelement('//*[@class="Pagination-pageCounts"]').text
             for _ in range(int(pages.split(" of ")[1])):
                 time.sleep(1) # Since the images are lazy loaded, we need to wait for them to load.
                 # find next page button
                 next_page = self.browser.get_webelement('//*[@class="Pagination-nextPage"]')
-                text = self.browser.get_webelement('//*[@class="Pagination-pageCounts"]').text # type: ignore
+                text = self.browser.get_webelement('//*[@class="Pagination-pageCounts"]').text
                 print('Page', text)
                 # get all items related on this page before proceeding to next page, this fixes stale elements.
-                elements = self.browser.get_webelements('//*[@class="PagePromo"]') # type: ignore
+                elements = self.browser.get_webelements('//*[@class="PagePromo"]')
                 items.extend(self.__collect_data_by_element(elements, search))
                 # go to next page and refresh the element
-                next_page.click() # type: ignore
+                next_page.click()
                 self.browser.wait_for_condition("return document.readyState === 'complete'")
                 next_page = self.browser.get_webelement('//*[@class="Pagination-nextPage"]')
 
@@ -207,7 +213,11 @@ class APNewsScrapper:
                     ]
                 )
             except Exception as exc:
-                self.browser.screenshot(element, f'output/screenshots/error{inspect.stack()[0][3]}.png')
+                path = f'output/screenshots/error{inspect.stack()[0][3]}.png'
+                item = workitems.outputs.create(save=False)
+                self.browser.screenshot(element, path)
+                item.add_file(path, name=f"document-{element.id}")
+                item.save()
                 print(exc)
                 continue
 
@@ -237,11 +247,14 @@ class APNewsScrapper:
             str: The file path of the screenshot, or 'no image found'.
         """
         try:
+            path = f'output/pictures/{title.lower().replace(" ", "_")}_{date}.png'
+            item = workitems.outputs.create(save=False)
             self.browser.screenshot(
                 element.find_element(By.CLASS_NAME, 'Image'),
-                f'output/pictures/{title.lower().replace(" ", "_")}_{date}.png'
             )
-            return f'output/pictures/{title.lower().replace(" ", "_")}_{date}.png'
+            item.add_file(path, name=f"document-{element.id}")
+            item.save()
+            return path
 
         except Exception:
             return 'no image found'
