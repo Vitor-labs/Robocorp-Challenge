@@ -6,11 +6,11 @@ from typing import List
 from pathlib import Path
 from datetime import datetime
 
-from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
-
+from selenium.webdriver.common.by import By
 from RPA.Browser.Selenium import Selenium
 from RPA.Robocorp.Vault import Vault
+from robocorp import workitems
 from RPA.JSON import JSON
 import pandas as pd
 
@@ -94,7 +94,10 @@ class APNewsScrapper:
                         "words_in_description"
                     ]
                 )
-                df.to_excel(OUTPUT_DIR / f'challenge_{word}.xlsx', index=False)
+                workitems.outputs.create(
+                    files=[OUTPUT_DIR / f'challenge_{word}.csv']
+                )
+                df.to_csv(OUTPUT_DIR / f'challenge_{word}.csv', index=False)
 
         except Exception as exc:
             print(exc)
