@@ -43,7 +43,6 @@ class APNewsScrapper:
         """
         self.browser.open_browser(
             url="https://apnews.com/",
-            browser='firefox',
         )
         keywords = (
             keywrds
@@ -98,7 +97,7 @@ class APNewsScrapper:
                         "words_in_description"
                     ]
                 )
-                path = str(OUTPUT_DIR / f'challenge_{word}.xlsx')
+                path = f'output/challenge_{word}.xlsx'
                 excel = Files()
                 excel.open_workbook(path)
                 excel.create_worksheet(f'challenge_{word}')
@@ -248,10 +247,10 @@ class APNewsScrapper:
             str: The file path of the screenshot, or 'no image found'.
         """
         try:
-            path = str(OUTPUT_DIR / f'/pictures/{title.lower().replace(" ", "_")}_{date}.png')
+            path = f'output/pictures/{title.lower().replace(" ", "_")}_{date}.png'
             item = workitems.outputs.create(save=False)
             self.browser.screenshot(
-                element.find_element(By.CLASS_NAME, 'Image'),
+                element.find_element(By.CLASS_NAME, 'Image'), path
             )
             item.add_file(path)
             item.save()
