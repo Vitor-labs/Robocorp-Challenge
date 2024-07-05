@@ -1,7 +1,7 @@
 from robocorp.tasks import task
 from robocorp import workitems
 
-from APNews import APNewsScrapper
+from src.APNews import APNewsScrapper
 
 
 @task

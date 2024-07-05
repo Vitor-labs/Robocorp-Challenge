@@ -7,13 +7,17 @@ from pathlib import Path
 from datetime import datetime
 
 from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.common.by import By
+
 from RPA.Browser.Selenium import Selenium
-from robocorp import workitems, storage
 from RPA.Robocorp.Vault import Vault
-from RPA.Excel.Files import Files
+from robocorp import workitems
 from RPA.JSON import JSON
 import pandas as pd
+
+from src.errors import ExtractError
+from src.contracts import ExtractContract
 
 OUTPUT_DIR = Path(str(os.environ.get('ROBOT_ARTIFACTS')))
 INPUT_URL = "input/keywords.json"
@@ -41,8 +45,11 @@ class APNewsScrapper:
         Args:
             keywrds (List[str], optional): list of keywords to search. Defaults to [].
         """
+        opts = FirefoxOptions()
+        opts.add_argument("--headless")
         self.browser.open_browser(
             url="https://apnews.com/",
+            options=opts,
         )
         keywords = (
             keywrds
@@ -86,7 +93,7 @@ class APNewsScrapper:
 
             result = self.__handle_search_page(word)
             if result:
-                df = pd.DataFrame(result, columns=[
+                df = pd.DataFrame(result.content, columns=[
                         "title", 
                         "link", 
                         "description", 
@@ -110,10 +117,9 @@ class APNewsScrapper:
                 item.save()
 
         except Exception as exc:
-            print(exc)
-            raise exc
+            raise ExtractError(str(exc)) from exc
 
-    def __handle_search_page(self, search:str) -> List[List[str | int]] | None:
+    def __handle_search_page(self, search:str) -> ExtractContract | None:
         """
         handle the search result page. Follows the steps:
         1. filter for the latest news
@@ -151,14 +157,13 @@ class APNewsScrapper:
                 elements = self.browser.get_webelements('//*[@class="PagePromo"]')
                 items.extend(self.__collect_data_by_element(elements, search))
                 # go to next page and refresh the element
-                break
                 next_page.click()
                 self.browser.wait_for_condition("return document.readyState === 'complete'")
                 next_page = self.browser.get_webelement('//*[@class="Pagination-nextPage"]')
 
             assert len(items) > 0, "Something got wrong, no items found"
             print("Done, Collecting data from items")
-            return items
+            return ExtractContract(content=items, id=search)
 
         except Exception as exc:
             raise exc
