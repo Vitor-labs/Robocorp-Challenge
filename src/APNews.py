@@ -7,10 +7,12 @@ from pathlib import Path
 from typing import List
 
 import pandas as pd
-from robocorp import storage, workitems
+from robocorp import workitems
 from RPA.Browser.Selenium import Selenium
+from RPA.Excel.Files import Files
 from RPA.JSON import JSON
 from RPA.Robocorp.Vault import Vault
+from RPA.Tables import Tables
 from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
@@ -35,6 +37,7 @@ class APNewsScrapper:
         self.json = JSON()
         self.vault = Vault()
         self.browser = Selenium()
+        self.tables = Tables()
         # self.browser.set_screenshot_directory(str('.'/OUTPUT_DIR/'screenshots'))
 
     def search_by_keyword(self, keywrds: List[str] = []) -> None:
@@ -112,8 +115,10 @@ class APNewsScrapper:
                     ],
                 )
                 path = f"output/challenge_{word}.xlsx"
-                storage.set_file(f"challenge_{word}", path=path)
-                df.to_excel(path, index=False)
+                lib = Files()
+                lib.create_workbook(sheet_name=f"challenge_{word}.xlsx")
+                lib.append_rows_to_worksheet(df.to_dict(orient="records"))
+                lib.save_workbook(path=path)
                 print(f"Saved {df.shape[0]} records")
 
         except Exception as exc:
@@ -166,8 +171,8 @@ class APNewsScrapper:
                 # get all items related on this page before proceeding to next page, this fixes stale elements.
                 elements = self.browser.get_webelements('//*[@class="PagePromo"]')
                 items.extend(self.__collect_data_by_element(elements, search))
-                break
                 # go to next page and refresh the element
+                break
                 next_page.click()
                 self.browser.wait_for_condition(
                     "return document.readyState === 'complete'"
