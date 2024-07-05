@@ -1,30 +1,29 @@
+import inspect
 import os
 import re
 import time
-import inspect
-from typing import List
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import List
 
-from selenium.webdriver.remote.webelement import WebElement
+import pandas as pd
+from robocorp import storage, workitems
+from RPA.Browser.Selenium import Selenium
+from RPA.JSON import JSON
+from RPA.Robocorp.Vault import Vault
 from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
 
-from RPA.Browser.Selenium import Selenium
-from RPA.Robocorp.Vault import Vault
-from robocorp import workitems
-from RPA.JSON import JSON
-import pandas as pd
-
-from src.errors import ExtractError
 from src.contracts import ExtractContract
+from src.errors import ExtractError
 
-OUTPUT_DIR = Path(str(os.environ.get('ROBOT_ARTIFACTS')))
+OUTPUT_DIR = Path(str(os.environ.get("ROBOT_ARTIFACTS")))
 INPUT_URL = "input/keywords.json"
 
 
 class APNewsScrapper:
-    def __init__(self, n_newest:int = 50) -> None:
+    def __init__(self, n_newest: int = 50) -> None:
         """
         Since the flow is continuous, im using a common browser and http client
         to be more memort efficient.
@@ -37,8 +36,8 @@ class APNewsScrapper:
         self.vault = Vault()
         self.browser = Selenium()
         # self.browser.set_screenshot_directory(str('.'/OUTPUT_DIR/'screenshots'))
-        
-    def search_by_keyword(self, keywrds:List[str] = []) -> None:
+
+    def search_by_keyword(self, keywrds: List[str] = []) -> None:
         """
         search news by common keywords
 
@@ -54,7 +53,7 @@ class APNewsScrapper:
         keywords = (
             keywrds
             if len(keywrds) > 0
-            else self.json.load_json_from_file(INPUT_URL)['keywords']
+            else self.json.load_json_from_file(INPUT_URL)["keywords"]
         )
         try:
             for word in keywords:
@@ -63,13 +62,13 @@ class APNewsScrapper:
         except Exception as exc:
             print(exc)
             self.browser.screenshot(
-                filename=f'output/screenshots/error_{inspect.stack()[0][3]}.png'
+                filename=f"output/screenshots/error_{inspect.stack()[0][3]}.png"
             )
         finally:
             self.browser.close_all_browsers()
-            print('Done')
+            print("Done")
 
-    def __search_by_keyword(self, word:str) -> None:
+    def __search_by_keyword(self, word: str) -> None:
         """
         search news by common keyword. Follows the steps:
         1. clicks on search icon
@@ -86,40 +85,41 @@ class APNewsScrapper:
         * date, picture_src, contains_money, words_in_title, words_in_dscr
         """
         try:
-            self.browser.get_webelement('//*[@class="SearchOverlay-search-button"]').click() 
-            self.browser.get_webelement('//*[@class="SearchOverlay-search-input"]').send_keys(word) 
-            self.browser.get_webelement('//*[@class="SearchOverlay-search-submit"]').click() 
+            self.browser.get_webelement(
+                '//*[@class="SearchOverlay-search-button"]'
+            ).click()
+            self.browser.get_webelement(
+                '//*[@class="SearchOverlay-search-input"]'
+            ).send_keys(word)
+            self.browser.get_webelement(
+                '//*[@class="SearchOverlay-search-submit"]'
+            ).click()
             self.browser.wait_for_condition("return document.readyState === 'complete'")
 
             result = self.__handle_search_page(word)
             if result:
-                df = pd.DataFrame(result.content, columns=[
-                        "title", 
-                        "link", 
-                        "description", 
-                        "date", 
-                        "picture_src", 
-                        'contains_money',
-                        "words_in_title", 
-                        "words_in_description"
-                    ]
+                df = pd.DataFrame(
+                    result.content,
+                    columns=[
+                        "title",
+                        "link",
+                        "description",
+                        "date",
+                        "picture_src",
+                        "contains_money",
+                        "words_in_title",
+                        "words_in_description",
+                    ],
                 )
-                path = f'output/challenge_{word}.xlsx'
-                # excel = Files()
-                # excel.open_workbook(path)
-                # excel.create_worksheet(f'challenge_{word}')
-                # df.to_excel(path, index=False)
-                # storage.set_file(f'challenge_{word}.csv',path)
-                # print(f'Saved {df.shape[0]} records')
-                item = workitems.outputs.create(save=False)
+                path = f"output/challenge_{word}.xlsx"
+                storage.set_file(f"challenge_{word}", path=path)
                 df.to_excel(path, index=False)
-                item.add_file(path)
-                item.save()
+                print(f"Saved {df.shape[0]} records")
 
         except Exception as exc:
             raise ExtractError(str(exc)) from exc
 
-    def __handle_search_page(self, search:str) -> ExtractContract | None:
+    def __handle_search_page(self, search: str) -> ExtractContract | None:
         """
         handle the search result page. Follows the steps:
         1. filter for the latest news
@@ -139,27 +139,42 @@ class APNewsScrapper:
             print("No Result Found for", search)
             return
         # get total number of results
-        total = self.browser.get_webelement('//*[@class="SearchResultsModule-count-desktop"]').text
+        total = self.browser.get_webelement(
+            '//*[@class="SearchResultsModule-count-desktop"]'
+        ).text
         print("Total", total)
         try:
             # select latest news
             self.browser.click_element('//*[@class="Select-input"]')
             self.browser.click_element('//*[@value="3"]')
             items = []
-            pages = self.browser.get_webelement('//*[@class="Pagination-pageCounts"]').text
+            pages = self.browser.get_webelement(
+                '//*[@class="Pagination-pageCounts"]'
+            ).text
             for _ in range(int(pages.split(" of ")[1])):
-                time.sleep(1) # Since the images are lazy loaded, we need to wait for them to load.
+                time.sleep(
+                    1
+                )  # Since the images are lazy loaded, we need to wait for them to load.
                 # find next page button
-                next_page = self.browser.get_webelement('//*[@class="Pagination-nextPage"]')
-                text = self.browser.get_webelement('//*[@class="Pagination-pageCounts"]').text
-                print('Page', text)
+                next_page = self.browser.get_webelement(
+                    '//*[@class="Pagination-nextPage"]'
+                )
+                text = self.browser.get_webelement(
+                    '//*[@class="Pagination-pageCounts"]'
+                ).text
+                print("Page", text)
                 # get all items related on this page before proceeding to next page, this fixes stale elements.
                 elements = self.browser.get_webelements('//*[@class="PagePromo"]')
                 items.extend(self.__collect_data_by_element(elements, search))
+                break
                 # go to next page and refresh the element
                 next_page.click()
-                self.browser.wait_for_condition("return document.readyState === 'complete'")
-                next_page = self.browser.get_webelement('//*[@class="Pagination-nextPage"]')
+                self.browser.wait_for_condition(
+                    "return document.readyState === 'complete'"
+                )
+                next_page = self.browser.get_webelement(
+                    '//*[@class="Pagination-nextPage"]'
+                )
 
             assert len(items) > 0, "Something got wrong, no items found"
             print("Done, Collecting data from items")
@@ -168,7 +183,9 @@ class APNewsScrapper:
         except Exception as exc:
             raise exc
 
-    def __collect_data_by_element(self, elements:List[WebElement], word:str) -> List[str | int]:
+    def __collect_data_by_element(
+        self, elements: List[WebElement], word: str
+    ) -> List[str | int]:
         """
         collect data (title, link, descrition, date, picture, count of word in
         the title, count of word in the description, title or description
@@ -181,31 +198,36 @@ class APNewsScrapper:
 
         Returns:
             List[str | int]: list of data gathered
-        
+
         Notes:
         * find_element not working at all, trying with just selenium.
         * SeleniumLibrary WebElement works diferently from pure Selenium WebElement
         """
         results = []
         money_pattern = re.compile(
-            r'''
+            r"""
                 \$\d{1,3}(,\d{3})*(\.\d{2})? | # Matches $ followed by digits, commas, and optional cents
                 \d+(\.\d{2})?\s*dollars |      # Matches number followed by 'dollars'
                 \d+(\.\d{2})?\s*USD            # Matches number followed by 'USD'
-            ''',
-            re.VERBOSE
+            """,
+            re.VERBOSE,
         )
+
         def contains_money_format(text):
             return bool(money_pattern.search(text))
-            
+
         for element in elements:
             try:
-                title = element.find_element(By.CLASS_NAME, 'PagePromoContentIcons-text').text
-                link = element.find_element(By.TAG_NAME, 'a').get_attribute('href')
-                dscr = element.find_element(By.CLASS_NAME, 'PagePromo-description').text
+                title = element.find_element(
+                    By.CLASS_NAME, "PagePromoContentIcons-text"
+                ).text
+                link = element.find_element(By.TAG_NAME, "a").get_attribute("href")
+                dscr = element.find_element(By.CLASS_NAME, "PagePromo-description").text
                 date = self.__try_to_find_date(element)
-            
-                contains_money = contains_money_format(title) or contains_money_format(dscr)
+
+                contains_money = contains_money_format(title) or contains_money_format(
+                    dscr
+                )
                 picture_src = self.__check_if_news_has_img(element, title, date)
                 words_in_title = title.count(word)
                 words_in_dscr = dscr.count(word)
@@ -219,11 +241,11 @@ class APNewsScrapper:
                         picture_src,
                         contains_money,
                         words_in_title,
-                        words_in_dscr
+                        words_in_dscr,
                     ]
                 )
             except Exception as exc:
-                path = f'output/screenshots/error{inspect.stack()[0][3]}.png'
+                path = f"output/screenshots/error{inspect.stack()[0][3]}.png"
                 item = workitems.outputs.create(save=False)
                 self.browser.screenshot(element, path)
                 item.add_file(path)
@@ -232,17 +254,23 @@ class APNewsScrapper:
                 continue
 
         return results
-            
-    def __try_to_find_date(self, element:WebElement) -> str:
-        try:
-            date = element.find_element(By.CLASS_NAME, 'PagePromo-date').text
-            if not date:
-                date = element.find_element(By.CLASS_NAME, 'TodayInHistoryPromo-date').text
-            return datetime.strptime(date, '%B %d').strftime('%m-%d') # TODO: get the year
-        except Exception:
-            return 'No date found'
 
-    def __check_if_news_has_img(self, element:WebElement, title:str, date:str) -> str:
+    def __try_to_find_date(self, element: WebElement) -> str:
+        try:
+            date = element.find_element(By.CLASS_NAME, "PagePromo-date").text
+            if not date:
+                date = element.find_element(
+                    By.CLASS_NAME, "TodayInHistoryPromo-date"
+                ).text
+            return datetime.strptime(date, "%B %d").strftime(
+                "%m-%d"
+            )  # TODO: get the year
+        except Exception:
+            return "No date found"
+
+    def __check_if_news_has_img(
+        self, element: WebElement, title: str, date: str
+    ) -> str:
         """
         Takes in a WebElement, a title string, and a date string and attempts
         to take a screenshot of the element's 'Image' element. If successful,
@@ -259,15 +287,13 @@ class APNewsScrapper:
         try:
             path = f'output/pictures/{title.lower().replace(" ", "_")}_{date}.png'
             item = workitems.outputs.create(save=False)
-            self.browser.screenshot(
-                element.find_element(By.CLASS_NAME, 'Image'), path
-            )
+            self.browser.screenshot(element.find_element(By.CLASS_NAME, "Image"), path)
             item.add_file(path)
             item.save()
             return path
 
         except Exception:
-            return 'no image found'
+            return "no image found"
 
     def __check_if_results_found(self) -> bool:
         """
@@ -278,7 +304,9 @@ class APNewsScrapper:
             bool: value indicating if there are any results
         """
         try:
-            result = self.browser.get_webelement('//*[@class="SearchResultsModule-noResults"]')
+            result = self.browser.get_webelement(
+                '//*[@class="SearchResultsModule-noResults"]'
+            )
             return False if result else True
         except Exception:
             return True
