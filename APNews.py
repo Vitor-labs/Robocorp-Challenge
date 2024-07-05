@@ -56,7 +56,7 @@ class APNewsScrapper:
         except Exception as exc:
             print(exc)
             self.browser.screenshot(
-                filename=str(OUTPUT_DIR /f'/screenshots/error_{inspect.stack()[0][3]}.png')
+                filename=f'output/screenshots/error_{inspect.stack()[0][3]}.png'
             )
         finally:
             self.browser.close_all_browsers()
@@ -98,12 +98,16 @@ class APNewsScrapper:
                     ]
                 )
                 path = f'output/challenge_{word}.xlsx'
-                excel = Files()
-                excel.open_workbook(path)
-                excel.create_worksheet(f'challenge_{word}')
+                # excel = Files()
+                # excel.open_workbook(path)
+                # excel.create_worksheet(f'challenge_{word}')
+                # df.to_excel(path, index=False)
+                # storage.set_file(f'challenge_{word}.csv',path)
+                # print(f'Saved {df.shape[0]} records')
+                item = workitems.outputs.create(save=False)
                 df.to_excel(path, index=False)
-                storage.set_file(f'challenge_{word}.csv',path)
-                print(f'Saved {df.shape[0]} records')
+                item.add_file(path)
+                item.save()
 
         except Exception as exc:
             print(exc)
@@ -147,6 +151,7 @@ class APNewsScrapper:
                 elements = self.browser.get_webelements('//*[@class="PagePromo"]')
                 items.extend(self.__collect_data_by_element(elements, search))
                 # go to next page and refresh the element
+                break
                 next_page.click()
                 self.browser.wait_for_condition("return document.readyState === 'complete'")
                 next_page = self.browser.get_webelement('//*[@class="Pagination-nextPage"]')
@@ -216,7 +221,7 @@ class APNewsScrapper:
                 path = f'output/screenshots/error{inspect.stack()[0][3]}.png'
                 item = workitems.outputs.create(save=False)
                 self.browser.screenshot(element, path)
-                item.add_file(path, name=f"document-{element.id}")
+                item.add_file(path)
                 item.save()
                 print(exc)
                 continue
